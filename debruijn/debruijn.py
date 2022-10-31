@@ -70,7 +70,6 @@ def get_arguments():
 
 
 def read_fastq(fastq_file):
-    #fastq_file = "eva71_two_reads.fq"
     with open(fastq_file, "r") as f1:
         for i in f1:
             yield next(f1).strip()
@@ -107,17 +106,17 @@ def build_graph(kmer_dico):
 
 
 
-def remove_paths(graph, path_list, delete_entry_node, delete_sink_node):
+def remove_paths(kmer_graph, path_list, delete_entry_node, delete_sink_node):
     for node in path_list:
         if not delete_entry_node and not delete_sink_node:  # if both False
-            graph.remove_nodes_from(node[1:-1])  # remove first and last node
+            kmer_graph.remove_nodes_from(node[1:-1])  # remove first and last node
         elif delete_entry_node and not delete_sink_node:
-            graph.remove_nodes_from(node[:-1])  # remove first node
+            kmer_graph.remove_nodes_from(node[:-1])  # remove first node
         elif not delete_entry_node and delete_sink_node:
-            graph.remove_nodes_from(node[1:])  # remove last node
+            kmer_graph.remove_nodes_from(node[1:])  # remove last node
         else:
-            graph.remove_nodes_from(node)  # if both True
-    return graph
+            kmer_graph.remove_nodes_from(node)  # if both True
+    return kmer_graph
 
 
 def std(data):
@@ -125,7 +124,7 @@ def std(data):
 
 
 
-def select_best_path(graph, path_list, path_length, weight_avg_list, 
+def select_best_path(kmer_graph, path_list, path_length, weight_avg_list,
                      delete_entry_node=False, delete_sink_node=False):
     best_length_p = []
     best_weight_p = []
@@ -142,37 +141,37 @@ def select_best_path(graph, path_list, path_length, weight_avg_list,
     print(random.choice(best_length_p))  # Without this line, test not passed
 
     path_list.pop(path_list.index(best_path))
-    graph = remove_paths(graph, path_list, delete_entry_node, delete_sink_node)
-    return graph
+    kmer_graph = remove_paths(kmer_graph, path_list, delete_entry_node, delete_sink_node)
+    return kmer_graph
 
 
 
 
-def path_average_weight(graph, path):
+def path_average_weight(kmer_graph, path):
     avg = 0
     len_path = len(path) - 1  # -1 avoid index of out range
     for comp in range(len_path):
-        avg += graph[path[comp]][path[comp + 1]]["weight"]
+        avg += kmer_graph[path[comp]][path[comp + 1]]["weight"]
     return avg / len_path
 
-def solve_bubble(graph, ancestor_node, descendant_node):
+def solve_bubble(kmer_graph, ancestor_node, descendant_node):
     path_length = []
     weight_avg_list = []
-    path_list = list(nx.all_simple_paths(graph, source=ancestor_node, target=descendant_node))
+    path_list = list(nx.all_simple_paths(kmer_graph, source=ancestor_node, target=descendant_node))
     for path in path_list:
         path_length.append(len(path))
-        weight_avg_list.append(path_average_weight(graph, path))
-    graph = select_best_path(graph, path_list, path_length, weight_avg_list)
-    return graph
+        weight_avg_list.append(path_average_weight(kmer_graph, path))
+    kmer_graph = select_best_path(kmer_graph, path_list, path_length, weight_avg_list)
+    return kmer_graph
 
 
 
-def simplify_bubbles(graph):
+def simplify_bubbles(kmer_graph):
     ancestors = []
     descendants = []
-    for node in graph.nodes:
-        successor_list = list(graph.successors(node))  # collect a list of successors of node
-        predecessor_list = list(graph.predecessors(node))  # same with predecessors
+    for node in kmer_graph.nodes:
+        successor_list = list(kmer_graph.successors(node))  # collect a list of successors of node
+        predecessor_list = list(kmer_graph.predecessors(node))  # same with predecessors
         if len(successor_list) > 1:  # if successor -> ancestor
             ancestors.append(node)
         if len(predecessor_list) > 1:  # if predecessor -> descendant
@@ -181,47 +180,34 @@ def simplify_bubbles(graph):
     for comp_anc in range(len(ancestors)):
         for comp_desc in range(len(descendants)):
             if ancestors[comp_anc] != descendants[comp_desc]:  # if bubble
-                graph = solve_bubble(graph, ancestors[comp_anc], descendants[comp_desc])
-    return graph
+                kmer_graph = solve_bubble(kmer_graph, ancestors[comp_anc], descendants[comp_desc])
+    return kmer_graph
 
 
 
-def solve_entry_tips(graph, starting_nodes):
+def solve_entry_tips(kmer_graph, starting_nodes):
     lst_path = []
     wei_path = []
     len_path = []
     for node in starting_nodes:
-        for descendant in nx.descendants(graph,
+        for descendant in nx.descendants(kmer_graph,
                                          node):  # descendants(G, source) Returns all nodes reachable from source in G.
-            predecessor = list(graph.predecessors(descendant))
+            predecessor = list(kmer_graph.predecessors(descendant))
             if len(predecessor) > 1:
-                for path in nx.all_simple_paths(graph, node, descendant):
-                    lst_path.append(path)
-                    len_path.append(len(path))
-                    wei_path.append(path_average_weight(graph, path))
-    graph = select_best_path(graph, lst_path, len_path, wei_path, True, False)
-    return (graph)
-
-
-def solve_out_tips(kmer_graph, ending_nodes):
-    """lst_path = []
-    wei_path = []
-    len_path = []
-    for node in ending_nodes:
-        for ancestor in nx.ancestors(kmer_graph,
-                                     node):  # ancestors(G, source) Returns all nodes having a path to source in G.
-            successor = list(kmer_graph.successors(ancestor))
-            if len(successor) > 1:
-                for path in nx.all_simple_paths(kmer_graph, node, ancestor):
+                for path in nx.all_simple_paths(kmer_graph, node, descendant):
                     lst_path.append(path)
                     len_path.append(len(path))
                     wei_path.append(path_average_weight(kmer_graph, path))
-    graph = select_best_path(kmer_graph, lst_path, len_path, wei_path, False, True)
-    return (kmer_graph)"""
-  path_list = []
-    path_length = []
-    weight_avg_list = []
-    for node in kmer_graph.nodes:
+    graph = select_best_path(kmer_graph, lst_path, len_path, wei_path, True, False)
+    return (kmer_graph)
+
+
+def solve_out_tips(kmer_graph, ending_nodes):
+
+path_list = []
+path_length = []
+weight_avg_list = []
+for node in kmer_graph.nodes:
         successors_list = list(kmer_graph.successors(node))
         if len(successors_list) > 1:
             for end in ending_nodes:
@@ -326,12 +312,12 @@ def main():
     # Get arguments
     args = get_arguments()
     # Lecture du fichier et construction du graphe:
-    dic_kmer = build_kmer_dict(args.fastq_file, args.kmer_size)
-    graph = build_graph(dic_kmer)
-    starting_nodes = get_starting_nodes(graph)
-    sink_nodes = get_sink_nodes(graph)
+    kmer_dico = build_kmer_dict(args.fastq_file, args.kmer_size)
+    kmer_graph = build_graph(kmer_dico)
+    starting_nodes = get_starting_nodes(kmer_graph)
+    sink_nodes = get_sink_nodes(kmer_graph)
     # Résolution des bulles:
-    simplify_bubbles = simplify_bubbles(graph)
+    simplify_bubbles = simplify_bubbles(kmer_graph)
     # Resolution des points d'entrée et de sortie
     entry_tips = solve_entry_tips(simplify_bubbles, starting_nodes)
     out_tips = solve_out_tips(entry_tips, sink_nodes)
